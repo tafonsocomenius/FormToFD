@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Form → Ficha de Diagnóstico</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 36px;
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 6px; }
+    .subtitle { color: #666; font-size: 14px; margin-bottom: 28px; }
+    .section-title { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 22px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-google { background: white; color: #333; border: 1.5px solid #ddd; width: 100%; justify-content: center; }
+    .btn-google:hover { background: #f8f8f8; }
+    .btn-primary { background: #4285f4; color: white; width: 100%; justify-content: center; }
+    .btn-primary:hover { background: #3367d6; }
+    .btn-primary:disabled { background: #b0c4f5; cursor: not-allowed; }
+    .btn-print { background: #34a853; color: white; padding: 10px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-print:hover { background: #2d9248; }
+
+    input[type=text] {
+      width: 100%; padding: 10px 14px; border: 1.5px solid #ddd;
+      border-radius: 8px; font-size: 14px; color: #333;
+      transition: border-color 0.2s; margin-bottom: 16px;
+    }
+    input[type=text]:focus { outline: none; border-color: #4285f4; }
+
+    .status {
+      padding: 12px 16px; border-radius: 8px; font-size: 14px;
+      display: flex; align-items: center; gap: 10px; margin-top: 14px;
+    }
+    .status.info { background: #e8f0fe; color: #1a56db; }
+    .status.success { background: #e6f4ea; color: #1e7e34; }
+    .status.error { background: #fce8e6; color: #c5221f; }
+    .status.loading { background: #fff8e1; color: #856404; }
+    .spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .user-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .user-dot { width: 10px; height: 10px; border-radius: 50%; background: #34a853; }
+    .user-email { font-size: 13px; color: #444; }
+    .signout { margin-left: auto; background: none; border: none; color: #888; font-size: 12px; cursor: pointer; }
+
+    .respondent-card {
+      background: #f8f9fa; border-radius: 10px; padding: 16px;
+      margin-bottom: 12px; border-left: 3px solid #4285f4;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .respondent-name { font-weight: 700; font-size: 15px; color: #222; }
+    .respondent-sub { font-size: 12px; color: #666; margin-top: 3px; }
+    .respondent-stats { font-size: 12px; color: #888; margin-top: 3px; }
+
+    #loginSection { }
+    #mainSection { display: none; }
+    #resultsSection { display: none; }
+
+    hr { border: none; border-top: 1px solid #eee; margin: 22px 0; }
+
+    /* ── PRINT / FD STYLES ── */
+    @media print {
+      body { background: white; padding: 0; }
+      .card, .no-print { display: none !important; }
+      .fd-print { display: block !important; }
+      @page { margin: 15mm; size: A4; }
+    }
+
+    .fd-print {
+      display: none;
+      font-family: Arial, sans-serif;
+      font-size: 10pt;
+      color: #000;
+    }
+    .fd-print .fd-page { page-break-after: always; padding: 10mm; }
+    .fd-print .fd-page:last-child { page-break-after: auto; }
+    .fd-header { text-align: center; margin-bottom: 16px; }
+    .fd-header h2 { font-size: 14pt; font-weight: bold; }
+    .fd-header h3 { font-size: 11pt; font-weight: normal; margin-top: 4px; }
+    .fd-section { margin-bottom: 10px; }
+    .fd-section-title { background: #333; color: white; padding: 4px 8px; font-weight: bold; font-size: 9pt; }
+    .fd-data-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    .fd-data-table td { border: 1px solid #999; padding: 4px 8px; font-size: 9pt; vertical-align: top; }
+    .fd-data-table td:first-child { font-weight: bold; width: 35%; background: #f5f5f5; }
+    .uc-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .uc-table th { background: #e0e0e0; border: 1px solid #999; padding: 4px 8px; font-size: 9pt; text-align: left; }
+    .uc-table td { border: 1px solid #999; padding: 4px 8px; font-size: 9pt; vertical-align: middle; }
+    .uc-header { background: #d0d8e8; font-weight: bold; }
+    .check-cell { text-align: center; width: 80px; }
+    .check-yes { color: #1a6b2a; font-size: 14pt; }
+    .check-no { color: #b00020; font-size: 14pt; }
+    .check-empty { color: #aaa; font-size: 12pt; }
+    .fd-legend { font-size: 8pt; color: #555; margin-top: 8px; border-top: 1px solid #ccc; padding-top: 6px; }
+    .fd-sign { margin-top: 20px; display: flex; justify-content: space-between; font-size: 9pt; }
+
+    .stats-bar { display: flex; gap: 16px; margin: 10px 0; }
+    .stat { background: #f0f4f8; border-radius: 8px; padding: 10px 16px; flex: 1; text-align: center; }
+    .stat-num { font-size: 22px; font-weight: 800; color: #4285f4; }
+    .stat-label { font-size: 11px; color: #666; margin-top: 2px; }
+    .stat-num.green { color: #34a853; }
+    .stat-num.red { color: #ea4335; }
+  </style>
+</head>
+<body>
+
+<!-- UI CARD -->
+<div class="card no-print">
+  <h1>📋 Google Form → Ficha de Diagnóstico</h1>
+  <p class="subtitle">Gera a Ficha de Diagnóstico preenchida para cada formando, pronta a imprimir como PDF</p>
+
+  <!-- LOGIN -->
+  <div id="loginSection">
+    <p style="color:#666; font-size:14px; margin-bottom:18px;">Faz login com a conta Google que criou o Form.</p>
+    <button class="btn btn-google" onclick="initGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
+      Entrar com Google
+    </button>
+  </div>
+
+  <!-- MAIN -->
+  <div id="mainSection">
+    <div class="user-bar">
+      <div class="user-dot"></div>
+      <span class="user-email" id="userEmail"></span>
+      <button class="signout" onclick="signOut()">Sair</button>
+    </div>
+
+    <p class="section-title">Link ou ID do Google Form</p>
+    <input type="text" id="formUrl" placeholder="https://docs.google.com/forms/d/FORM_ID/... ou só o ID" />
+
+    <button class="btn btn-primary" onclick="loadResponses()">📥 Carregar Respostas</button>
+    <div id="statusMain"></div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div id="resultsSection" class="card no-print">
+  <div id="resultsHeader"></div>
+  <div id="respondentList"></div>
+</div>
+
+<!-- FD PRINT OUTPUT (hidden until print) -->
+<div class="fd-print" id="fdPrintArea"></div>
+
+<script>
+const CLIENT_ID = '204596311689-s9gao1vpushvo31n6jm6dos3ipm7t8rr.apps.googleusercontent.com';
+const SCOPE = 'https://www.googleapis.com/auth/forms.responses.readonly https://www.googleapis.com/auth/forms.body.readonly';
+
+let accessToken = null;
+let tokenClient = null;
+let formData = null;      // form structure
+let responsesData = null; // all responses
+
+// ── AUTH ──────────────────────────────────────────────────────────────────
+function initGoogle() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPE,
+    callback: (resp) => {
+      if (resp.error) { showStatus('statusMain', 'Erro: ' + resp.error, 'error'); return; }
+      accessToken = resp.access_token;
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: 'Bearer ' + accessToken }
+      }).then(r => r.json()).then(info => {
+        document.getElementById('userEmail').textContent = info.email || '';
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('mainSection').style.display = 'block';
+      });
+    }
+  });
+  tokenClient.requestAccessToken();
+}
+
+function signOut() {
+  google.accounts.oauth2.revoke(accessToken, () => {
+    accessToken = null;
+    document.getElementById('loginSection').style.display = 'block';
+    document.getElementById('mainSection').style.display = 'none';
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('fdPrintArea').innerHTML = '';
+  });
+}
+
+async function apiCall(url) {
+  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || 'HTTP ' + res.status); }
+  return res.json();
+}
+
+// ── EXTRACT FORM ID ───────────────────────────────────────────────────────
+function extractFormId(input) {
+  input = input.trim();
+  const m = input.match(/\/forms\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{30,}$/.test(input)) return input;
+  return null;
+}
+
+// ── LOAD RESPONSES ────────────────────────────────────────────────────────
+async function loadResponses() {
+  const input = document.getElementById('formUrl').value;
+  const formId = extractFormId(input);
+  if (!formId) { showStatus('statusMain', 'URL ou ID inválido.', 'error'); return; }
+
+  showStatus('statusMain', '<div class="spinner"></div> A carregar estrutura do form...', 'loading');
+
+  try {
+    formData = await apiCall(`https://forms.googleapis.com/v1/forms/${formId}`);
+    showStatus('statusMain', '<div class="spinner"></div> A carregar respostas...', 'loading');
+    responsesData = await apiCall(`https://forms.googleapis.com/v1/forms/${formId}/responses`);
+
+    document.getElementById('statusMain').innerHTML = '';
+    renderResults(formData, responsesData);
+  } catch(e) {
+    showStatus('statusMain', '❌ ' + e.message, 'error');
+  }
+}
+
+// ── RENDER RESULTS LIST ───────────────────────────────────────────────────
+function renderResults(form, responses) {
+  const section = document.getElementById('resultsSection');
+  section.style.display = 'block';
+
+  const items = responses.responses || [];
+  const title = form.info?.title || 'Ficha de Diagnóstico';
+
+  // Build question map: questionId → title
+  const qMap = buildQuestionMap(form);
+
+  document.getElementById('resultsHeader').innerHTML = `
+    <p class="section-title">${title}</p>
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-num">${items.length}</div><div class="stat-label">Respostas</div></div>
+      <div class="stat"><div class="stat-num">${Object.keys(qMap).length}</div><div class="stat-label">Perguntas</div></div>
+    </div>
+    <hr>
+    <p class="section-title">Seleciona um formando para gerar a FD</p>
+  `;
+
+  const list = document.getElementById('respondentList');
+  list.innerHTML = '';
+
+  if (items.length === 0) {
+    list.innerHTML = '<p style="color:#888; font-size:14px;">Sem respostas ainda.</p>';
+    return;
+  }
+
+  items.forEach((resp, idx) => {
+    const answers = resp.answers || {};
+    // Find name answer (first text question)
+    let nome = '—', bi = '—', validade = '—';
+    for (const [qId, ans] of Object.entries(answers)) {
+      const qTitle = (qMap[qId] || '').toLowerCase();
+      const val = ans.textAnswers?.answers?.[0]?.value || '';
+      if (qTitle.includes('nome')) nome = val;
+      else if (qTitle.includes('identificaç') || qTitle.includes('bi') || qTitle.includes('cc')) bi = val;
+      else if (qTitle.includes('validade')) validade = val;
+    }
+
+    // Count sei/nao
+    let sei = 0, nao = 0;
+    for (const [qId, ans] of Object.entries(answers)) {
+      const val = (ans.textAnswers?.answers?.[0]?.value || '').toLowerCase();
+      if (val.includes('sei fazer') && !val.includes('não')) sei++;
+      else if (val.includes('não') || val.includes('nao')) nao++;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'respondent-card';
+    div.innerHTML = `
+      <div>
+        <div class="respondent-name">${nome}</div>
+        <div class="respondent-sub">BI: ${bi} | Validade: ${validade}</div>
+        <div class="respondent-stats">✅ ${sei} Sei Fazer &nbsp;|&nbsp; ❌ ${nao} Não sei fazer</div>
+      </div>
+      <button class="btn-print" onclick="printFD(${idx})">🖨️ Gerar FD</button>
+    `;
+    list.appendChild(div);
+  });
+
+  // Also add "Generate all" button if >1
+  if (items.length > 1) {
+    const allBtn = document.createElement('div');
+    allBtn.style.marginTop = '12px';
+    allBtn.innerHTML = `<button class="btn btn-primary" onclick="printAll()" style="width:100%">🖨️ Gerar Todas (${items.length})</button>`;
+    list.appendChild(allBtn);
+  }
+}
+
+// ── BUILD QUESTION MAP ────────────────────────────────────────────────────
+function buildQuestionMap(form) {
+  const map = {};
+  const items = form.items || [];
+  items.forEach(item => {
+    if (item.questionItem) {
+      map[item.questionItem.question.questionId] = item.title;
+    } else if (item.questionGroupItem) {
+      item.questionGroupItem.questions.forEach(q => {
+        map[q.questionId] = item.title + ' — ' + (q.rowQuestion?.title || '');
+      });
+    }
+  });
+  return map;
+}
+
+// ── GENERATE FD HTML ──────────────────────────────────────────────────────
+function generateFDHtml(responseIdx) {
+  const form = formData;
+  const resp = (responsesData.responses || [])[responseIdx];
+  if (!resp) return '';
+
+  const qMap = buildQuestionMap(form);
+  const answers = resp.answers || {};
+
+  // Extract personal data
+  let nome = '', bi = '', validade = '';
+  for (const [qId, ans] of Object.entries(answers)) {
+    const qTitle = (qMap[qId] || '').toLowerCase();
+    const val = ans.textAnswers?.answers?.[0]?.value || '';
+    if (qTitle.includes('nome')) nome = val;
+    else if (qTitle.includes('identificaç') || qTitle.includes('bi') || qTitle.includes('cc')) bi = val;
+    else if (qTitle.includes('validade')) validade = val;
+  }
+
+  // Extract qualificação from form title
+  const formTitle = form.info?.title || '';
+  const qualMatch = formTitle.match(/—\s*(.+)/);
+  const qualificacao = qualMatch ? qualMatch[1].trim() : formTitle;
+  const nivel = form.info?.description?.match(/Nível \d+/)?.[0] || 'Nível 4';
+
+  // Group questions by UC
+  const ucMap = {}; // ucTitle → [{taskTitle, answer}]
+  const items = form.items || [];
+  let currentUC = null;
+
+  items.forEach(item => {
+    const title = item.title || '';
+    if (/^UC\s+\d+/i.test(title) && item.pageBreakItem !== undefined) {
+      currentUC = title;
+      if (!ucMap[currentUC]) ucMap[currentUC] = [];
+    } else if (item.questionItem && currentUC) {
+      const qId = item.questionItem.question.questionId;
+      const ans = answers[qId];
+      const ansVal = ans?.textAnswers?.answers?.[0]?.value || '';
+      ucMap[currentUC].push({ task: title, answer: ansVal });
+    }
+  });
+
+  // Build HTML
+  let html = `
+    <div class="fd-page">
+      <div class="fd-header">
+        <h2>Ficha de Diagnóstico</h2>
+        <h3>${qualificacao} — ${nivel}</h3>
+      </div>
+
+      <div class="fd-section">
+        <div class="fd-section-title">DADOS PESSOAIS</div>
+        <table class="fd-data-table">
+          <tr><td>Nome</td><td>${nome}</td></tr>
+          <tr><td>Nº de Identificação</td><td>${bi}</td></tr>
+          <tr><td>Válido até</td><td>${validade}</td></tr>
+        </table>
+      </div>
+
+      <div class="fd-section">
+        <div class="fd-section-title">IDENTIFICAÇÃO DA QUALIFICAÇÃO</div>
+        <table class="fd-data-table">
+          <tr><td>Designação</td><td>${qualificacao}</td></tr>
+          <tr><td>Nível</td><td>${nivel}</td></tr>
+        </table>
+      </div>
+
+      <div class="fd-section">
+        <div class="fd-section-title">REFERENCIAL DE COMPETÊNCIAS PROFISSIONAIS</div>
+      </div>
+  `;
+
+  // UC tables
+  Object.entries(ucMap).forEach(([uc, tasks]) => {
+    html += `
+      <table class="uc-table" style="margin-bottom:8px;">
+        <tr><th colspan="3" class="uc-header">${uc}</th></tr>
+        <tr>
+          <th style="width:60%">Tarefa</th>
+          <th class="check-cell">Sei Fazer</th>
+          <th class="check-cell">Não sei fazer</th>
+        </tr>
+    `;
+    tasks.forEach(({task, answer}) => {
+      const isSei = answer.toLowerCase().includes('sei fazer') && !answer.toLowerCase().includes('não');
+      const isNao = answer.toLowerCase().includes('não') || answer.toLowerCase().includes('nao');
+      const isPratica = answer.toLowerCase().includes('praticar');
+      html += `
+        <tr>
+          <td>${task}</td>
+          <td class="check-cell">${isSei || isPratica ? '<span class="check-yes">✓</span>' : '<span class="check-empty">○</span>'}</td>
+          <td class="check-cell">${isNao ? '<span class="check-no">✓</span>' : '<span class="check-empty">○</span>'}</td>
+        </tr>
+      `;
+    });
+    html += '</table>';
+  });
+
+  const today = new Date().toLocaleDateString('pt-PT');
+  html += `
+      <div class="fd-sign">
+        <span>Centro Qualifica: Rui Pena &amp; Associados</span>
+        <span>Data: ${today}</span>
+        <span>Assinatura do candidato: _______________</span>
+      </div>
+    </div>
+  `;
+
+  return html;
+}
+
+// ── PRINT ────────────────────────────────────────────────────────────────
+function printFD(idx) {
+  const html = generateFDHtml(idx);
+  document.getElementById('fdPrintArea').innerHTML = html;
+  document.getElementById('fdPrintArea').style.display = 'block';
+  setTimeout(() => window.print(), 300);
+}
+
+function printAll() {
+  const items = responsesData.responses || [];
+  let html = '';
+  items.forEach((_, idx) => { html += generateFDHtml(idx); });
+  document.getElementById('fdPrintArea').innerHTML = html;
+  document.getElementById('fdPrintArea').style.display = 'block';
+  setTimeout(() => window.print(), 300);
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────
+function showStatus(id, msg, type) {
+  document.getElementById(id).innerHTML = `<div class="status ${type}">${msg}</div>`;
+}
+</script>
+</body>
+</html>
