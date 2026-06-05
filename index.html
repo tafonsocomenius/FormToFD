@@ -270,15 +270,8 @@ function renderResults(form, responses) {
 
   items.forEach((resp, idx) => {
     const answers = resp.answers || {};
-    // Find name answer (first text question)
-    let nome = '—', bi = '—', validade = '—';
-    for (const [qId, ans] of Object.entries(answers)) {
-      const qTitle = (qMap[qId] || '').toLowerCase();
-      const val = ans.textAnswers?.answers?.[0]?.value || '';
-      if (qTitle.includes('nome')) nome = val;
-      else if (qTitle.includes('identificaç') || qTitle.includes('bi') || qTitle.includes('cc')) bi = val;
-      else if (qTitle.includes('validade')) validade = val;
-    }
+    const { nome, bi, validade } = extractPersonalData(form, answers);
+    let nomeD = nome || '—', biD = bi || '—', validadeD = validade || '—';
 
     // Count sei/nao
     let sei = 0, nao = 0;
@@ -292,8 +285,8 @@ function renderResults(form, responses) {
     div.className = 'respondent-card';
     div.innerHTML = `
       <div>
-        <div class="respondent-name">${nome}</div>
-        <div class="respondent-sub">BI: ${bi} | Validade: ${validade}</div>
+        <div class="respondent-name">${nomeD}</div>
+        <div class="respondent-sub">BI: ${biD} | Validade: ${validadeD}</div>
         <div class="respondent-stats">✅ ${sei} Sei Fazer &nbsp;|&nbsp; ❌ ${nao} Não sei fazer</div>
       </div>
       <button class="btn-print" onclick="printFD(${idx})">🖨️ Gerar FD</button>
@@ -326,6 +319,28 @@ function buildQuestionMap(form) {
   return map;
 }
 
+// ── EXTRACT PERSONAL DATA (positional — first text questions before page break) ──
+function extractPersonalData(form, answers) {
+  const items = form.items || [];
+  const textQIds = []; // IDs of text questions before the first page break
+
+  for (const item of items) {
+    if (item.pageBreakItem !== undefined) break; // stop at first section
+    if (item.questionItem) {
+      const qType = item.questionItem.question.textQuestion !== undefined ? 'text' :
+                    item.questionItem.question.choiceQuestion !== undefined ? 'choice' : 'other';
+      if (qType === 'text') textQIds.push(item.questionItem.question.questionId);
+    }
+  }
+
+  const vals = textQIds.map(id => answers[id]?.textAnswers?.answers?.[0]?.value || '');
+  return {
+    nome:     vals[0] || '',
+    bi:       vals[1] || '',
+    validade: vals[2] || ''
+  };
+}
+
 // ── GENERATE FD HTML ──────────────────────────────────────────────────────
 function generateFDHtml(responseIdx) {
   const form = formData;
@@ -335,15 +350,8 @@ function generateFDHtml(responseIdx) {
   const qMap = buildQuestionMap(form);
   const answers = resp.answers || {};
 
-  // Extract personal data
-  let nome = '', bi = '', validade = '';
-  for (const [qId, ans] of Object.entries(answers)) {
-    const qTitle = (qMap[qId] || '').toLowerCase();
-    const val = ans.textAnswers?.answers?.[0]?.value || '';
-    if (qTitle.includes('nome')) nome = val;
-    else if (qTitle.includes('identificaç') || qTitle.includes('bi') || qTitle.includes('cc')) bi = val;
-    else if (qTitle.includes('validade')) validade = val;
-  }
+  // Extract personal data (positional — robust)
+  const { nome, bi, validade } = extractPersonalData(form, answers);
 
   // Extract qualificação from form title
   const formTitle = form.info?.title || '';
