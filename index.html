@@ -419,13 +419,12 @@ function generateFDHtml(responseIdx) {
         </tr>
     `;
     tasks.forEach(({task, answer}) => {
-      const isSei = answer.toLowerCase().includes('sei fazer') && !answer.toLowerCase().includes('não');
-      const isNao = answer.toLowerCase().includes('não') || answer.toLowerCase().includes('nao');
-      const isPratica = answer.toLowerCase().includes('praticar');
+      const isSei = answer.toLowerCase().includes('sei fazer');
+      const isNao = answer.toLowerCase().includes('não sei fazer');
       html += `
         <tr>
           <td>${task}</td>
-          <td class="check-cell">${isSei || isPratica ? '<span class="check-yes">✓</span>' : '<span class="check-empty">○</span>'}</td>
+          <td class="check-cell">${isSei ? '<span class="check-yes">✓</span>' : '<span class="check-empty">○</span>'}</td>
           <td class="check-cell">${isNao ? '<span class="check-no">✓</span>' : '<span class="check-empty">○</span>'}</td>
         </tr>
       `;
