@@ -419,8 +419,9 @@ function generateFDHtml(responseIdx) {
         </tr>
     `;
     tasks.forEach(({task, answer}) => {
-      const isSei = answer.toLowerCase().includes('sei fazer');
-      const isNao = answer.toLowerCase().includes('não sei fazer');
+      const ansLower = answer.toLowerCase();
+      const isNao = ansLower.includes('não sei fazer') || ansLower.includes('nao sei fazer');
+      const isSei = !isNao && ansLower.includes('sei fazer');
       html += `
         <tr>
           <td>${task}</td>
